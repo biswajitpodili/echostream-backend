@@ -14,3 +14,5 @@ ConnectDB()
   .catch((error) => {
     console.error("Database connection failed", error);
   });
+
+  
