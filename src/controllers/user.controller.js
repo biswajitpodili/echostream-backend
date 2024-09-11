@@ -249,6 +249,29 @@ const updateUserDetails = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, "User updated", user));
 });
 
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Avatar not handled properly");
+  }
+  console.log(req.file.path);
+
+  const avatar = await uploadOnCloudinary(req.file.path);
+
+  if (!avatar) {
+    throw new ApiError(500, "Failed to upload");
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
+    },
+    { new: true }
+  ).select("-password -refreshToken");
+  res.status(200).json(new ApiResponse(200, "Avatar updated", user));
+});
+
 export {
   registerUser,
   loginUser,
@@ -256,5 +279,6 @@ export {
   refreshAccessToken,
   changePassword,
   getCurrentUser,
-  updateUserDetails
+  updateUserDetails,
+  updateUserAvatar,
 };
