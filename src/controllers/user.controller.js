@@ -155,7 +155,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "User Logged out", {}));
 });
 
-const refreshToken = asyncHandler(async (req, res) => {
+const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
   if (!incomingRefreshToken) {
@@ -199,4 +199,33 @@ const refreshToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshToken };
+const changePassword = asyncHandler(async (req, res) => {
+  console.log(req);
+  const { oldPassword, newPassword } = req.body;
+  try {
+    const user = await User.findById(req.user?._id);
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+    if (!isPasswordCorrect) {
+      throw new ApiError(400, "Invalid Password");
+    }
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, "Password Changed Successfully", {}));
+  } catch (error) {
+    throw new ApiError(
+      400,
+      error.message || "Something went wrong while changing password"
+    );
+  }
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  res
+    .status(200)
+    .json(new ApiResponse(200, "User fetched successfully", req.user));
+});
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken, changePassword, getCurrentUser };
