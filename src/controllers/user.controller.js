@@ -246,10 +246,10 @@ const updateUserDetails = asyncHandler(async (req, res) => {
         new: true,
       }
     ).select("-password -refreshToken");
-  
+
     res.status(200).json(new ApiResponse(200, "User updated", user));
   } catch (error) {
-    throw new ApiError(400,"Something went wrong while updating user")
+    throw new ApiError(400, "Something went wrong while updating user");
   }
 });
 
@@ -258,9 +258,9 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     if (!req.file) {
       throw new ApiError(400, "Avatar not handled properly");
     }
-  
+
     const avatar = await uploadOnCloudinary(req.file.path);
-  
+
     if (!avatar) {
       throw new ApiError(500, "Failed to upload");
     }
@@ -273,9 +273,11 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
       },
       { new: true }
     ).select("-password -refreshToken");
-    res.status(200).json(new ApiResponse(200, "Avatar updated successfully", user));
+    res
+      .status(200)
+      .json(new ApiResponse(200, "Avatar updated successfully", user));
   } catch (error) {
-    throw new ApiError(400,"Something went wrong while updating avatar")
+    throw new ApiError(400, "Something went wrong while updating avatar");
   }
 });
 
@@ -304,10 +306,82 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
       );
     }
 
-    res.status(200).json(new ApiResponse(200, "Cover image updated successfully", user));
+    res
+      .status(200)
+      .json(new ApiResponse(200, "Cover image updated successfully", user));
   } catch (error) {
     throw new ApiError(400, "Something went wrong while updating cover image");
   }
+});
+
+const getUserChanneProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+  const channel = await User.aggregate([
+    {
+      //Stages / Pipelines
+      $match: {
+        username: username?.trim().toLowerCase(),
+      },
+    },
+    {
+      //Pipeline for subscribers
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      //Pipeline for subscribed to
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        totalSubscribers: {
+          $size: "$subscribers",
+        },
+        totalSubscribedTo: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullname: 1,
+        username: 1,
+        email: 1,
+        avatar: 1,
+        coverImage: 1,
+        totalSubscribers: 1,
+        totalSubscribedTo: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+  if (!channel.length) {
+    throw new ApiError(404, "Channel not found");
+  }
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Channel data fetched successfully", channel[0])
+    );
 });
 
 export {
@@ -319,5 +393,6 @@ export {
   getCurrentUser,
   updateUserDetails,
   updateUserAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
+  getUserChanneProfile,
 };

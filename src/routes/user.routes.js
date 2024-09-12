@@ -9,12 +9,14 @@ import {
   updateUserDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  getUserChanneProfile,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
+//Unsecured Routes
 router.route("/register").post(
   upload.fields([
     { name: "avatar", maxCoount: 1 },
@@ -22,7 +24,6 @@ router.route("/register").post(
   ]),
   registerUser
 );
-
 router.route("/login").post(loginUser);
 
 //Secured Routes
@@ -37,5 +38,6 @@ router
 router
   .route("/update-coverimage")
   .put(upload.single("coverImage"), verifyJWT, updateUserCoverImage);
+router.route("/:username").get(verifyJWT, getUserChanneProfile);
 
 export default router;
