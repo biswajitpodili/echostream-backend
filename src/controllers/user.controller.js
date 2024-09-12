@@ -2,7 +2,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
@@ -259,7 +262,11 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     if (!req.file) {
       throw new ApiError(400, "Avatar not handled properly");
     }
-
+    const existingAvatarPublicId = req.user?.avatar.substring(
+      req.user?.avatar.lastIndexOf("/") + 1,
+      req.user?.avatar.lastIndexOf(".")
+    );
+    await deleteFromCloudinary(existingAvatarPublicId);
     const avatar = await uploadOnCloudinary(req.file.path);
 
     if (!avatar) {
@@ -288,6 +295,11 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     if (!coverImagePath) {
       throw new ApiError(400, "Upload cover image");
     }
+    const existingCoverImagePublicId = req.user?.coverImage.substring(
+      req.user?.coverImage.lastIndexOf("/") + 1,
+      req.user?.coverImage.lastIndexOf(".")
+    );
+    await deleteFromCloudinary(existingCoverImagePublicId);
     const coverImage = await uploadOnCloudinary(coverImagePath);
     if (!coverImage.url) {
       throw new ApiError(500, "Image not uploaded");
