@@ -266,7 +266,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
       req.user?.avatar.lastIndexOf("/") + 1,
       req.user?.avatar.lastIndexOf(".")
     );
-    await deleteFromCloudinary(existingAvatarPublicId);
+    await deleteFromCloudinary(existingAvatarPublicId, "image");
     const avatar = await uploadOnCloudinary(req.file.path);
 
     if (!avatar) {
@@ -299,7 +299,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
       req.user?.coverImage.lastIndexOf("/") + 1,
       req.user?.coverImage.lastIndexOf(".")
     );
-    await deleteFromCloudinary(existingCoverImagePublicId);
+    await deleteFromCloudinary(existingCoverImagePublicId, "image");
     const coverImage = await uploadOnCloudinary(coverImagePath);
     if (!coverImage.url) {
       throw new ApiError(500, "Image not uploaded");
