@@ -221,6 +221,16 @@ const getVideos = asyncHandler(async (req, res) => {
 const watchVideo = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $addToSet: {
+        watchHistory: id,
+      },
+    },
+    { new: true }
+  );
+
   await Video.findByIdAndUpdate(
     id,
     {
