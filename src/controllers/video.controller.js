@@ -220,7 +220,16 @@ const getVideos = asyncHandler(async (req, res) => {
 
 const watchVideo = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  console.log(id);
+
+  await Video.findByIdAndUpdate(
+    id,
+    {
+      $inc: {
+        views: 1,
+      },
+    },
+    { new: true }
+  );
 
   const video = await Video.aggregate([
     {
@@ -236,15 +245,42 @@ const watchVideo = asyncHandler(async (req, res) => {
         as: "owner",
         pipeline: [
           {
+            $lookup: {
+              from: "subscriptions",
+              localField: "_id",
+              foreignField: "channel",
+              as: "subscribers",
+            },
+          },
+          {
+            $addFields: {
+              totalSubscribers: {
+                $size: "$subscribers",
+              },
+              isSubscribedtoThisChannel: {
+                $cond: {
+                  if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                  then: true,
+                  else: false,
+                },
+              },
+            },
+          },
+          {
             $project: {
               firstname: 1,
               username: 1,
+              fullname: 1,
               avatar: 1,
+              totalSubscribers: 1,
+              isSubscribedtoThisChannel: 1,
             },
           },
         ],
       },
     },
+    //Likes
+    //Comments
     {
       $addFields: {
         owner: {
@@ -252,50 +288,21 @@ const watchVideo = asyncHandler(async (req, res) => {
         },
       },
     },
-  ]);
-
-  const channelDetails = await User.aggregate([
-    {
-      $match: {
-        _id: video[0].owner._id,
-      },
-    },
-    {
-      $lookup: {
-        from: "subscriptions",
-        localField: "_id",
-        foreignField: "channel",
-        as: "subscribers",
-      },
-    },
-    {
-      $addFields: {
-        totalSubscribers: {
-          $size: "$subscribers",
-        },
-        isSubscribed: {
-          $cond: {
-            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
-            then: true,
-            else: false,
-          },
-        },
-      },
-    },
     {
       $project: {
-        totalSubscribers: 1,
-        isSubscribed: 1,
+        videoFile: 1,
+        title: 1,
+        description: 1,
+        owner: 1,
+        views: 1,
+        createdAt: 1,
       },
     },
   ]);
 
-  const videoDetails = {
-    ...video[0],
-    channelDetails,
-  };
-
-  res.status(200).json(new ApiResponse(200, "video fetched", videoDetails));
+  res
+    .status(200)
+    .json(new ApiResponse(200, "Video fetched successfully", video[0]));
 });
 
 export {
