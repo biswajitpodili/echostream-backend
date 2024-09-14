@@ -5,7 +5,9 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 import { Video } from "../models/video.model.js";
+import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 
 const uploadVideo = asyncHandler(async (req, res) => {
   try {
@@ -147,8 +149,160 @@ const updateThumbnail = asyncHandler(async (req, res) => {
   }
 });
 
-const getVideos = asyncHandler(async (req, res) => {});
+const getVideos = asyncHandler(async (req, res) => {
+  try {
+    const videos = await Video.aggregate([
+      {
+        $match: {
+          isPublished: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "owner",
+          foreignField: "_id",
+          as: "owner",
+          pipeline: [
+            {
+              $project: {
+                fullname: 1,
+                username: 1,
+                avatar: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: "likes",
+          localField: "_id",
+          foreignField: "video",
+          as: "likes",
+          pipeline: [
+            {
+              $addFields: {
+                likes: {
+                  $size: "$likes",
+                },
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          likes: {
+            $size: "$likes",
+          },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          thumbnail: 1,
+          owner: 1,
+          createdAt: 1,
+          likes: 1,
+          duration: 1,
+        },
+      },
+    ]);
 
-const watchVideo = asyncHandler(async (req, res) => {});
+    res
+      .status(200)
+      .json(new ApiResponse(200, "Videos fetched successfully", videos));
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while fetching videos");
+  }
+});
 
-export { uploadVideo, updateVideoDetails, updateVideoFile, updateThumbnail };
+const watchVideo = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  console.log(id);
+
+  const video = await Video.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              firstname: 1,
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        owner: {
+          $first: "$owner",
+        },
+      },
+    },
+  ]);
+
+  const channelDetails = await User.aggregate([
+    {
+      $match: {
+        _id: video[0].owner._id,
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $addFields: {
+        totalSubscribers: {
+          $size: "$subscribers",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        totalSubscribers: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+
+  const videoDetails = {
+    ...video[0],
+    channelDetails,
+  };
+
+  res.status(200).json(new ApiResponse(200, "video fetched", videoDetails));
+});
+
+export {
+  uploadVideo,
+  updateVideoDetails,
+  updateVideoFile,
+  updateThumbnail,
+  getVideos,
+  watchVideo,
+};

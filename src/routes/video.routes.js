@@ -1,9 +1,11 @@
 import { Router } from "express";
 import {
+  getVideos,
   updateThumbnail,
   updateVideoDetails,
   updateVideoFile,
   uploadVideo,
+  watchVideo,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -26,5 +28,8 @@ router
 router
   .route("/update-video-thumbnail")
   .patch(upload.single("thumbnail"), verifyJWT, updateThumbnail);
+
+router.route("/get-videos").get(verifyJWT, getVideos);
+router.route("/watch/:id").get(verifyJWT, watchVideo);
 
 export default router;
