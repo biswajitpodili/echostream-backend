@@ -221,6 +221,7 @@ const getVideos = asyncHandler(async (req, res) => {
 const watchVideo = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
+  //Updating watch history of the user
   await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -231,6 +232,7 @@ const watchVideo = asyncHandler(async (req, res) => {
     { new: true }
   );
 
+  //Increasing the views by 1
   await Video.findByIdAndUpdate(
     id,
     {
@@ -241,6 +243,7 @@ const watchVideo = asyncHandler(async (req, res) => {
     { new: true }
   );
 
+  //Aggregate Pipeline for video information
   const video = await Video.aggregate([
     {
       $match: {
