@@ -174,37 +174,28 @@ const getVideos = asyncHandler(async (req, res) => {
           ],
         },
       },
-      {
-        $lookup: {
-          from: "likes",
-          localField: "_id",
-          foreignField: "video",
-          as: "likes",
-          pipeline: [
-            {
-              $addFields: {
-                likes: {
-                  $size: "$likes",
-                },
-              },
-            },
-          ],
-        },
-      },
-      {
-        $addFields: {
-          likes: {
-            $size: "$likes",
-          },
-        },
-      },
+      // {
+      //   $lookup: {
+      //     from: "likes",
+      //     localField: "_id",
+      //     foreignField: "video",
+      //     as: "videolikes",
+      //   }
+      // },
+      // {
+      //   $addFields: {
+      //     likes: {
+      //       $size: "$videolikes",
+      //     },
+      //   },
+      // },
       {
         $project: {
           title: 1,
           thumbnail: 1,
           owner: 1,
           createdAt: 1,
-          likes: 1,
+          views: 1,
           duration: 1,
         },
       },
@@ -214,7 +205,10 @@ const getVideos = asyncHandler(async (req, res) => {
       .status(200)
       .json(new ApiResponse(200, "Videos fetched successfully", videos));
   } catch (error) {
-    throw new ApiError(500, "Something went wrong while fetching videos");
+    throw new ApiError(
+      500,
+      error.message || "Something went wrong while fetching videos"
+    );
   }
 });
 
