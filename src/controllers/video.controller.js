@@ -13,6 +13,10 @@ const uploadVideo = asyncHandler(async (req, res) => {
   try {
     const { title, description } = req.body;
 
+    if (!req.user) {
+      throw new ApiError(401, "Unauthorized to upload video");
+    }
+
     if (!title || !description) {
       throw new ApiError(400, "Enter all feilds");
     }
@@ -59,7 +63,8 @@ const uploadVideo = asyncHandler(async (req, res) => {
 
 const updateVideoDetails = asyncHandler(async (req, res) => {
   try {
-    const { id, title, description, isPublished } = req.body;
+    const { id } = req.params;
+    const { title, description, isPublished } = req.body;
     if (!id) {
       throw new ApiError(400, "Not a valid video ID");
     }
@@ -87,7 +92,7 @@ const updateVideoDetails = asyncHandler(async (req, res) => {
 
 const updateVideoFile = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.body;
+    const { id } = req.params;
 
     if (!req.file) {
       throw new ApiError(400, "File not uploaded properly");
@@ -95,6 +100,9 @@ const updateVideoFile = asyncHandler(async (req, res) => {
     const video = await Video.findById(id);
     if (!video) {
       throw new ApiError(400, "Invalid video id");
+    }
+    if (video.owner.toString() !== req.user._id.toString()) {
+      throw new ApiError(401, "Unauthorized to update videoFile");
     }
     const existingVideoFilePublicId = video?.videoFile.substring(
       video?.videoFile.lastIndexOf("/") + 1,
@@ -120,13 +128,16 @@ const updateVideoFile = asyncHandler(async (req, res) => {
 
 const updateThumbnail = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.body;
+    const { id } = req.params;
     if (!req.file) {
       throw new ApiError(400, "File not handled properly");
     }
     const video = await Video.findById(id);
     if (!video) {
       throw new ApiError(400, "Invalid video id");
+    }
+    if (video.owner.toString() !== req.user._id.toString()) {
+      throw new ApiError(401, "Unauthorized to update thumbnail");
     }
     const existingThumbnailPublicId = video?.thumbnail.substring(
       video?.thumbnail.lastIndexOf("/") + 1,
@@ -145,6 +156,40 @@ const updateThumbnail = asyncHandler(async (req, res) => {
       400,
       error.message ||
         "Something went wrong while updating the thumbnail, try later"
+    );
+  }
+});
+
+const deleteVideo = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const video = await Video.findById(id);
+    if (!video) {
+      throw new ApiError(400, "Invalid video id");
+    }
+    if (video.owner.toString() !== req.user._id.toString()) {
+      throw new ApiError(401, "Unauthorized to delete video");
+    }
+
+    const existingThumbnailPublicId = video?.thumbnail.substring(
+      video?.thumbnail.lastIndexOf("/") + 1,
+      video?.thumbnail.lastIndexOf(".")
+    );
+    const existingVideoFilePublicId = video?.videoFile.substring(
+      video?.videoFile.lastIndexOf("/") + 1,
+      video?.videoFile.lastIndexOf(".")
+    );
+    await deleteFromCloudinary(existingThumbnailPublicId, "image");
+    await deleteFromCloudinary(existingVideoFilePublicId, "video");
+    const response = await Video.findByIdAndDelete(id);
+    if (!response) {
+      throw new ApiError(400, "Failed to delete the video, try again later");
+    }
+    res.status(200).json(new ApiResponse(200, "Video deleted successfully"));
+  } catch (error) {
+    throw new ApiError(
+      400,
+      error.message || "Something went wrong while deleting the video"
     );
   }
 });
@@ -239,11 +284,14 @@ const watchVideo = asyncHandler(async (req, res) => {
 
   //Aggregate Pipeline for video information
   const video = await Video.aggregate([
+    //Match the video ID
     {
       $match: {
         _id: new mongoose.Types.ObjectId(id),
       },
     },
+
+    //Owner Information and Subscription Information
     {
       $lookup: {
         from: "users",
@@ -286,15 +334,85 @@ const watchVideo = asyncHandler(async (req, res) => {
         ],
       },
     },
+
     //Likes
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "video",
+        as: "likes",
+      },
+    },
+
     //Comments
+    {
+      $lookup: {
+        from: "comments",
+        localField: "_id",
+        foreignField: "video",
+        as: "comments",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $lookup: {
+              from: "likes",
+              localField: "_id",
+              foreignField: "comment",
+              as: "likes",
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+              likes: {
+                $size: "$likes",
+              },
+            },
+          },
+          {
+            $project: {
+              owner: 1,
+              content: 1,
+              likes: 1,
+              createdAt: 1,
+            },
+          },
+        ],
+      },
+    },
+
+    //Calculating the total likes of the video and owner information
     {
       $addFields: {
         owner: {
           $first: "$owner",
         },
+        likes: {
+          $size: "$likes",
+        },
       },
     },
+
+    //Projecting the required fields
     {
       $project: {
         videoFile: 1,
@@ -302,10 +420,16 @@ const watchVideo = asyncHandler(async (req, res) => {
         description: 1,
         owner: 1,
         views: 1,
+        likes: 1,
+        comments: 1,
         createdAt: 1,
       },
     },
   ]);
+
+  if (!video.length) {
+    throw new ApiError(400, "Invalid video ID");
+  }
 
   res
     .status(200)
@@ -317,6 +441,7 @@ export {
   updateVideoDetails,
   updateVideoFile,
   updateThumbnail,
+  deleteVideo,
   getVideos,
   watchVideo,
 };

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  deleteVideo,
   getVideos,
   updateThumbnail,
   updateVideoDetails,
@@ -21,13 +22,14 @@ router.route("/upload-video").post(
   verifyJWT,
   uploadVideo
 );
-router.route("/update-video-details").patch(verifyJWT, updateVideoDetails);
+router.route("/update-video-details/:id").patch(verifyJWT, updateVideoDetails);
 router
-  .route("/update-video-file")
+  .route("/update-video-file/:id")
   .patch(upload.single("videoFile"), verifyJWT, updateVideoFile);
 router
-  .route("/update-video-thumbnail")
+  .route("/update-video-thumbnail/:id")
   .patch(upload.single("thumbnail"), verifyJWT, updateThumbnail);
+router.route("/delete-video/:id").delete(verifyJWT, deleteVideo);
 
 router.route("/get-videos").get(verifyJWT, getVideos);
 router.route("/watch/:id").get(verifyJWT, watchVideo);

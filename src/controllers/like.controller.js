@@ -7,6 +7,15 @@ const videoLike = asyncHandler(async (req, res) => {
   try {
     const { videoId } = req.params;
 
+    const isLiked = await Like.findOne({
+      video: videoId,
+      likedBy: req.user._id,
+    });
+
+    if (isLiked) {
+      throw new ApiError(400, "You have already liked this video");
+    }
+
     const response = await Like.create({
       video: videoId,
       likedBy: req.user._id,
@@ -55,6 +64,15 @@ const commentLike = asyncHandler(async (req, res) => {
   try {
     const { commentId } = req.params;
 
+    const isLiked = await Like.findOne({
+      comment: commentId,
+      likedBy: req.user._id,
+    });
+
+    if (isLiked) {
+      throw new ApiError(400, "You have already liked this comment");
+    }
+
     const response = await Like.create({
       comment: commentId,
       likedBy: req.user._id,
@@ -99,6 +117,15 @@ const commentUnlike = asyncHandler(async (req, res) => {
 const tweetLike = asyncHandler(async (req, res) => {
   try {
     const { tweetId } = req.params;
+
+    const isLiked = await Like.findOne({
+      tweet: tweetId,
+      likedBy: req.user._id,
+    });
+
+    if (isLiked) {
+      throw new ApiError(400, "You have already liked this tweet");
+    }
 
     const response = await Like.create({
       tweet: tweetId,
