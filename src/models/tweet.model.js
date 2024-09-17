@@ -14,4 +14,4 @@ const tweetSchema = new Schema(
   { timestamps: true }
 );
 
-const Tweet = model("Tweet", tweetSchema);
+export const Tweet = model("Tweet", tweetSchema);
