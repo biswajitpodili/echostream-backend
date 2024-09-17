@@ -334,14 +334,14 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Username is missing");
     }
     const channel = await User.aggregate([
+      //Stages / Pipelines
       {
-        //Stages / Pipelines
         $match: {
           username: username?.trim().toLowerCase(),
         },
       },
+      //Pipeline for subscribers
       {
-        //Pipeline for subscribers
         $lookup: {
           from: "subscriptions",
           localField: "_id",
@@ -349,8 +349,8 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           as: "subscribers",
         },
       },
+      //Pipeline for subscribed to
       {
-        //Pipeline for subscribed to
         $lookup: {
           from: "subscriptions",
           localField: "_id",
@@ -358,6 +358,66 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           as: "subscribedTo",
         },
       },
+      //Pipeline for videos
+      {
+        $lookup: {
+          from: "videos",
+          localField: "_id",
+          foreignField: "owner",
+          as: "videos",
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                thumbnail: 1,
+                views: 1,
+                createdAt: 1,
+              },
+            },
+          ],
+        },
+      },
+      //Pipeline for playlists
+      //Pipeline for tweets
+      {
+        $lookup: {
+          from: "tweets",
+          localField: "_id",
+          foreignField: "owner",
+          as: "tweets",
+          pipeline: [
+            {
+              $lookup: {
+                from: "likes",
+                localField: "_id",
+                foreignField: "tweet",
+                as: "likes",
+              },
+            },
+            {
+              $addFields: {
+                totalLikes: { $size: "$likes" },
+                isLiked: {
+                  $cond: {
+                    if: { $in: [req.user?._id, "$likes.likedBy"] },
+                    then: true,
+                    else: false,
+                  },
+                },
+              },
+            },
+            {
+              $project: {
+                content: 1,
+                createdAt: 1,
+                totalLikes: 1,
+                isLiked: 1,
+              },
+            },
+          ],
+        },
+      },
+      //Pipeline for adding fields
       {
         $addFields: {
           totalSubscribers: {
@@ -375,6 +435,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           },
         },
       },
+      //Pipeline for projecting fields
       {
         $project: {
           fullname: 1,
@@ -385,6 +446,8 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           totalSubscribers: 1,
           totalSubscribedTo: 1,
           isSubscribed: 1,
+          tweets: 1,
+          videos: 1,
         },
       },
     ]);
