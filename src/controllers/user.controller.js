@@ -378,6 +378,51 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
       },
       //Pipeline for playlists
+      {
+        $lookup: {
+          from: "playlists",
+          localField: "_id",
+          foreignField: "owner",
+          as: "playlists",
+          pipeline: [
+            {
+              $lookup: {
+                from: "videos",
+                localField: "videos",
+                foreignField: "_id",
+                as: "videos",
+                pipeline: [
+                  {
+                    $lookup: {
+                      from: "users",
+                      localField: "owner",
+                      foreignField: "_id",
+                      as: "owner",
+                      pipeline: [
+                        {
+                          $project: {
+                            fullname: 1,
+                            username: 1,
+                            avatar: 1,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    $project: {
+                      title: 1,
+                      thumbnail: 1,
+                      views: 1,
+                      owner: 1,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
       //Pipeline for tweets
       {
         $lookup: {
@@ -448,6 +493,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           isSubscribed: 1,
           tweets: 1,
           videos: 1,
+          playlists: 1,
         },
       },
     ]);
